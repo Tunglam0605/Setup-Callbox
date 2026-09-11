@@ -1,0 +1,5 @@
+esptool==5.3.1
+pyserial==3.5
+pyinstaller==6.16.0
+esp-idf-nvs-partition-gen>=0.1.0
+paho-mqtt>=1.6.1,<2.0.0

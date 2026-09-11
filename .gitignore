@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.venv-build/
+
+# PyInstaller working files
+tools/callbox_flasher/build/
+tools/callbox_flasher/dist/
+
+# Local update/download caches
+*.part
+*.update-new
+*.update-backup
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local private factory provisioning profile
+Setup-CallBox.factory.json
