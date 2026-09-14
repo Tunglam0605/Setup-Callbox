@@ -1,0 +1,35 @@
+{
+  "baseline_version": "package-d7ccf38-dirty",
+  "firmware_version": "1.5.6",
+  "chip": "esp32s3",
+  "flash_size": "16MB",
+  "flash_mode": "dio",
+  "flash_frequency": "80m",
+  "baud": 460800,
+  "images": [
+    {
+      "offset": "0x0",
+      "filename": "bootloader.bin",
+      "size": 21360,
+      "sha256": "413b9939b8a48d0945c39f96f6bda24d10b9b2dafac6d1198face0ec6cb23f07"
+    },
+    {
+      "offset": "0x8000",
+      "filename": "partition-table.bin",
+      "size": 3072,
+      "sha256": "ae79eb7a574d81935ea93c3f794d54557f1ddc7828b98507be04c0b3143ff9bc"
+    },
+    {
+      "offset": "0x210000",
+      "filename": "ota_data_initial.bin",
+      "size": 8192,
+      "sha256": "7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f"
+    }
+  ],
+  "application": {
+    "offset": "0x10000",
+    "filename": "callbox_sews.bin",
+    "size": 1283744,
+    "sha256": "885b895c6792c998ff5fc365367d5a550f18eda73e4fbcc77237c88da2e450c9"
+  }
+}

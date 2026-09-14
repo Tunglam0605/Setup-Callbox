@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "channel": "stable",
-  "published_at": "2026-09-12T06:45:47Z",
+  "published_at": "2026-09-14T05:44:53Z",
   "tool": {
-    "version": "1.3.0",
+    "version": "1.3.6",
     "filename": "Setup-CallBox.exe",
-    "size": 20138866,
-    "sha256": "41c7002a57a2e588ae4745502a20a1b38dd123393b098257ecb28c39ac270fed",
+    "size": 20184458,
+    "sha256": "d53398a172f0c62c5a68b0a237556c34db9b4b2b35fdf0593a5b965a4ede0ea3",
     "url": "https://raw.githubusercontent.com/Tunglam0605/Setup-Callbox/main/Setup-CallBox.exe"
   },
   "firmware": {
-    "package_version": "1.5.3",
-    "firmware_version": "1.5.3",
+    "package_version": "1.5.6",
+    "firmware_version": "1.5.6",
     "min_tool_version": "1.2.0",
-    "manifest_url": "https://raw.githubusercontent.com/Tunglam0605/Setup-Callbox/main/firmware/v1.5.3/firmware-manifest.json"
+    "manifest_url": "https://raw.githubusercontent.com/Tunglam0605/Setup-Callbox/main/firmware/v1.5.6/firmware-manifest.json"
   }
 }
