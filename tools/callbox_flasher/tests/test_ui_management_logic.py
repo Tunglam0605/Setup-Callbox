@@ -22,6 +22,15 @@ class ManagementLogicTests(unittest.TestCase):
         record = {"health": {"free_heap": 48 * 1024, "recovery": False, "mqtt": {"queue_drop": 1}}}
         self.assertEqual(health_level(record), "WARN")
 
+    def test_trace_log_drop_does_not_trigger_health_warning(self):
+        record = {
+            "health": {
+                "free_heap": 48 * 1024, "recovery": False,
+                "mqtt": {"queue_drop": 8, "management_trace_drop": 8, "wcs_queue_drop": 0, "cmd_drop": 0, "outbox_fail": 0}
+            }
+        }
+        self.assertEqual(health_level(record), "OK")
+
     def test_recovery_is_fault(self):
         record = {"health": {"free_heap": 48 * 1024, "recovery": True, "mqtt": {}}}
         self.assertEqual(health_level(record), "FAULT")

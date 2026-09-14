@@ -10,7 +10,7 @@
 - **Phiên bản Firmware nhúng sẵn:** **`v1.5.6`** (`callbox_sews`)
 - **Phần cứng hỗ trợ:** **Waveshare ESP32-S3-POE-ETH-8DI-8DO** (ESP32-S3, 16 MB Flash)
 - **File chạy độc lập Windows:** `Setup-CallBox.exe`
-- **Mã băm SHA-256 (`Setup-CallBox.exe`):** `d53398a172f0c62c5a68b0a237556c34db9b4b2b35fdf0593a5b965a4ede0ea3`
+- **Mã băm SHA-256 (`Setup-CallBox.exe`):** `e7ee21d79885ee9de7ae646017516dc61c29767a026667242caba8416c954667`
 
 ---
 
@@ -52,5 +52,5 @@ Setup-Callbox/
 Chạy kiểm thử bộ mã nguồn Tool:
 ```bash
 python -m unittest discover tools/callbox_flasher/tests
-# 121/121 tests PASS
+# 123/123 tests PASS
 ```

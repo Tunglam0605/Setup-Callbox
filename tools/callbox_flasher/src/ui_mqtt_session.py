@@ -10,9 +10,11 @@ from tools.callbox_flasher.src.ui_theme import COLORS
 class MqttSessionMixin:
     def _clear_mqtt_log(self) -> None:
         self.rc_log_text.delete("1.0", tk.END)
+
     def _mqtt_log_append(self, text: str) -> None:
         self.rc_log_text.insert(tk.END, text + "\n")
         self.rc_log_text.see(tk.END)
+
     def _on_mqtt_connect_click(self) -> None:
         if not PAHO_AVAILABLE:
             messagebox.showerror(
@@ -45,20 +47,26 @@ class MqttSessionMixin:
 
         if not self.mqtt_client:
             self.mqtt_client = CallboxRemoteConfigClient()
-            self.mqtt_client.on_connect = lambda ok, msg: self.root.after(0, self._on_mqtt_connect_result, ok, msg)
-            self.mqtt_client.on_ack = lambda cid, ok: self.root.after(0, self._on_mqtt_ack_result, cid, ok)
-            self.mqtt_client.on_button_ack = lambda cid, button, request_id, status, reason: self.root.after(0, self._on_mqtt_button_ack_result, cid, button, request_id, status, reason)
-            self.mqtt_client.on_io_state = lambda cid, state: self.root.after(0, self._dispatch_mqtt_io_state, cid, state)
-            self.mqtt_client.on_status_state = lambda cid, state: self.root.after(0, self._on_mqtt_status_state, cid, state)
-            self.mqtt_client.on_internet_state = lambda cid, state: self.root.after(0, self._on_mqtt_internet_state, cid, state)
-            self.mqtt_client.on_health_state = lambda cid, state: self.root.after(0, self._on_mqtt_health_state, cid, state)
-            self.mqtt_client.on_diagnostic_state = lambda cid, state: self.root.after(0, self._on_mqtt_diagnostic_state, cid, state)
-            self.mqtt_client.on_info_state = lambda cid, state: self.root.after(0, self._on_mqtt_info_state, cid, state)
-            self.mqtt_client.on_network_state = lambda cid, state: self.root.after(0, self._on_mqtt_network_state, cid, state)
-            self.mqtt_client.on_trace_event = lambda cid, event: self.root.after(0, self._on_mqtt_trace_event, cid, event)
-            self.mqtt_client.on_log = lambda m: self.root.after(0, self._mqtt_log_append, m)
+        self._bind_mqtt_client_callbacks()
 
         self.mqtt_client.connect(cfg)
+
+    def _bind_mqtt_client_callbacks(self) -> None:
+        if not self.mqtt_client:
+            return
+        self.mqtt_client.on_connect = lambda ok, msg: self.root.after(0, self._on_mqtt_connect_result, ok, msg)
+        self.mqtt_client.on_ack = lambda cid, ok: self.root.after(0, self._on_mqtt_ack_result, cid, ok)
+        self.mqtt_client.on_button_ack = lambda cid, button, request_id, status, reason: self.root.after(0, self._on_mqtt_button_ack_result, cid, button, request_id, status, reason)
+        self.mqtt_client.on_io_state = lambda cid, state: self.root.after(0, self._dispatch_mqtt_io_state, cid, state)
+        self.mqtt_client.on_status_state = lambda cid, state: self.root.after(0, self._on_mqtt_status_state, cid, state)
+        self.mqtt_client.on_internet_state = lambda cid, state: self.root.after(0, self._on_mqtt_internet_state, cid, state)
+        self.mqtt_client.on_health_state = lambda cid, state: self.root.after(0, self._on_mqtt_health_state, cid, state)
+        self.mqtt_client.on_diagnostic_state = lambda cid, state: self.root.after(0, self._on_mqtt_diagnostic_state, cid, state)
+        self.mqtt_client.on_info_state = lambda cid, state: self.root.after(0, self._on_mqtt_info_state, cid, state)
+        self.mqtt_client.on_network_state = lambda cid, state: self.root.after(0, self._on_mqtt_network_state, cid, state)
+        self.mqtt_client.on_trace_event = lambda cid, event: self.root.after(0, self._on_mqtt_trace_event, cid, event)
+        self.mqtt_client.on_log = lambda m: self.root.after(0, self._mqtt_log_append, m)
+
     def _on_mqtt_connect_result(self, ok: bool, msg: str) -> None:
         self.mqtt_is_connected = ok
         if ok:
@@ -81,9 +89,19 @@ class MqttSessionMixin:
                 self.btn_mgmt_connect.config(state=tk.NORMAL)
                 self.btn_mgmt_disconnect.config(state=tk.DISABLED)
         self._update_remote_button_state()
+
     def _on_mqtt_disconnect_click(self) -> None:
         if self.mqtt_client:
+            for cb in (
+                "on_connect", "on_ack", "on_button_ack", "on_io_state",
+                "on_status_state", "on_internet_state", "on_health_state",
+                "on_diagnostic_state", "on_info_state", "on_network_state",
+                "on_trace_event", "on_log",
+            ):
+                setattr(self.mqtt_client, cb, None)
             self.mqtt_client.disconnect()
+            self.mqtt_client = None
+
         self.mqtt_is_connected = False
         self.lbl_rc_broker_status.config(text="● Đã ngắt kết nối", fg=COLORS.muted)
         self.btn_rc_connect.config(state=tk.NORMAL)
@@ -94,8 +112,17 @@ class MqttSessionMixin:
         self._mqtt_log_append("Đã ngắt kết nối khỏi MQTT Broker.")
         self._reset_remote_io_display()
         if hasattr(self, "mgmt_mqtt_badge"):
-            self.mgmt_mqtt_badge.config(text="MQTT: OFFLINE", fg=COLORS.danger)
-            self.mgmt_online_badge.config(text="UNKNOWN", bg=COLORS.border, fg=COLORS.muted)
+            self.mgmt_mqtt_badge.config(text="MQTT: ĐÃ NGẮT", fg=COLORS.muted)
+            self.mgmt_online_badge.config(text="OFFLINE", bg=COLORS.border, fg=COLORS.muted)
+            self.mgmt_health_badge.config(text="HEALTH: --", bg=COLORS.border, fg=COLORS.muted)
+            if hasattr(self, "mgmt_alarm_label"):
+                self.mgmt_alarm_label.config(text="● Đã ngắt kết nối MQTT", bg=COLORS.border, fg=COLORS.muted)
+            if hasattr(self, "_fleet_devices"):
+                self._fleet_devices.clear()
+            if hasattr(self, "mgmt_fleet_tree"):
+                self.mgmt_fleet_tree.delete(*self.mgmt_fleet_tree.get_children())
+            if hasattr(self, "_management_clear_live_snapshot"):
+                self._management_clear_live_snapshot()
             self._reset_management_diagnostic()
 
         self._update_remote_button_state()

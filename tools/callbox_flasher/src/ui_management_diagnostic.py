@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import datetime as _dt
+import time
 import tkinter as tk
+from tkinter import messagebox
 
 from tools.callbox_flasher.src.ui_theme import COLORS
+from tools.callbox_flasher.src.ui_management_logic import age_text
 
 
 _CODE_LABELS = {
@@ -121,7 +124,7 @@ class ManagementDiagnosticUiMixin:
         if not event or int(event.get("id", 0) or 0) == 0:
             return f"{prefix}: --"
         return (
-            f"{prefix}: {diagnostic_event_title(event)} • "
+            f"{prefix} (Lịch sử): {diagnostic_event_title(event)} • "
             f"{diagnostic_reason_text(event.get('reason', ''))} • {diagnostic_event_meta(event)}"
         )
 
@@ -186,3 +189,50 @@ class ManagementDiagnosticUiMixin:
         self._management_log_event(
             f"TRACE task={event.get('task', 0)} seq={event.get('seq', 0)} → {event.get('stage') or '-'}{reason}"
         )
+
+    def _management_reset_target_task(self) -> None:
+        target = self.mgmt_target_id_var.get().strip()
+        if not target:
+            messagebox.showwarning("Reset Task", "Vui lòng nhập Callbox ID mục tiêu!", parent=self.root)
+            return
+        if not getattr(self, "mqtt_is_connected", False) or not self.mqtt_client:
+            messagebox.showwarning("Reset Task", "Chưa kết nối MQTT Broker!", parent=self.root)
+            return
+        ok, req_id = self.mqtt_client.send_remote_button(target, 3)
+        if ok:
+            self._mqtt_log_append(f"→ Đã gửi lệnh RESET / HỦY TASK (Nút 3, req={req_id}) tới Callbox {target}")
+            self.mgmt_alarm_label.config(
+                text=f"✓ Đã gửi lệnh giải phóng / reset task tới Callbox {target}",
+                bg=COLORS.success_bg, fg=COLORS.success_text
+            )
+        else:
+            messagebox.showerror("Reset Task", f"Gửi lệnh reset tới Callbox {target} thất bại!", parent=self.root)
+
+    def _management_copy_snapshot(self) -> None:
+        target = self.mgmt_target_id_var.get().strip() or "-"
+        now = time.monotonic()
+        text = (
+            f"Callbox {target}\nOnline={self.mgmt_online_badge.cget('text')} Health={self.mgmt_health_badge.cget('text')}\n"
+            f"FW={self.mgmt_vars['fw'].get()} Comm={self.mgmt_vars['comm'].get()} Task1={self.mgmt_vars['task1'].get()} Task2={self.mgmt_vars['task2'].get()}\n"
+            f"WiFi={self.mgmt_vars['wifi'].get()} IP={self.mgmt_vars['ip'].get()} RSSI={self.mgmt_vars['rssi'].get()}\n"
+            f"RAM={self.mgmt_vars['ram_usage'].get()} ({self.mgmt_vars['ram_used'].get()}) Flash={self.mgmt_vars['flash_usage'].get()} ({self.mgmt_vars['flash_used'].get()})\n"
+            f"RAM free={self.mgmt_vars['ram_free'].get()} Min={self.mgmt_vars['ram_min_free'].get()} Reset={self.mgmt_vars['reset_reason'].get()}\n"
+            f"MQTTdrop={self.mgmt_vars['mqtt_drop'].get()} CmdDrop={self.mgmt_vars['cmd_drop'].get()}\n"
+            f"Diagnostic={self.mgmt_diag_current_title.cget('text') if hasattr(self, 'mgmt_diag_current_title') else '-'}\n"
+            f"Freshness status={age_text(self._mgmt_last_status_rx, now)} io={age_text(self._mgmt_last_io_rx, now)} health={age_text(self._mgmt_last_health_rx, now)} diagnostic={age_text(self._mgmt_last_diagnostic_rx, now)}"
+        )
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self._management_log_event("Đã copy snapshot chẩn đoán")
+
+    def _management_log_event(self, text: str) -> None:
+        if not hasattr(self, "mgmt_event_text"):
+            return
+        self.mgmt_event_text.config(state=tk.NORMAL)
+        self.mgmt_event_text.insert(tk.END, f"{time.strftime('%H:%M:%S')}  {text}\n")
+        lines = int(self.mgmt_event_text.index("end-1c").split(".")[0])
+        if lines > 120:
+            self.mgmt_event_text.delete("1.0", "20.0")
+        self.mgmt_event_text.see(tk.END)
+        self.mgmt_event_text.config(state=tk.DISABLED)
+

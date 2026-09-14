@@ -116,6 +116,21 @@ class FlasherApp(
         if getattr(self, "_closing", False):
             return
         self._closing = True
+
+        # 1. Cancel recurring after timer handles
+        for after_attr in (
+            "_mgmt_subscribe_after_id", "_io_subscribe_after_id",
+            "_mgmt_tick_after_id", "_drain_events_after_id", "_poll_ports_after_id",
+        ):
+            after_id = getattr(self, after_attr, None)
+            if after_id:
+                try:
+                    self.root.after_cancel(after_id)
+                except Exception:
+                    pass
+                setattr(self, after_attr, None)
+
+        # 2. Detach MQTT client callbacks and disconnect in background
         mqtt_client = self.mqtt_client
         self.mqtt_client = None
         if mqtt_client:
@@ -131,4 +146,13 @@ class FlasherApp(
                 daemon=True,
                 name="mqtt-shutdown",
             ).start()
-        self.root.destroy()
+
+        # 3. Stop Tk event loop and destroy window
+        try:
+            self.root.quit()
+        except Exception:
+            pass
+        try:
+            self.root.destroy()
+        except Exception:
+            pass

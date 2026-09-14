@@ -47,6 +47,8 @@ class ManagementUiMixin:
         ttk.Button(toolbar, text="COPY", style="Secondary.TButton", command=self._management_copy_snapshot).pack(side=tk.LEFT)
         self.btn_mgmt_log_toggle = ttk.Button(toolbar, text="NHẬT KÝ  ▾", style="Secondary.TButton", command=self._management_toggle_log)
         self.btn_mgmt_log_toggle.pack(side=tk.LEFT, padx=(6, 0))
+        self.btn_mgmt_reset_task = ttk.Button(toolbar, text="🔄 RESET TASK VỀ IDLE", style="Secondary.TButton", command=self._management_reset_target_task)
+        self.btn_mgmt_reset_task.pack(side=tk.LEFT, padx=(8, 0))
         self.mgmt_health_badge = tk.Label(toolbar, text="HEALTH: --", font=("Segoe UI", 9, "bold"), bg=COLORS.border, fg=COLORS.muted, padx=10, pady=4)
         self.mgmt_health_badge.pack(side=tk.RIGHT, padx=(6, 0))
         self.mgmt_online_badge = tk.Label(toolbar, text="UNKNOWN", font=("Segoe UI", 9, "bold"), bg=COLORS.border, fg=COLORS.muted, padx=10, pady=4)
@@ -140,7 +142,7 @@ class ManagementUiMixin:
         self._management_sync_body_height()
 
         self.mgmt_target_id_var.trace_add("write", lambda *_: self._management_target_changed())
-        self.root.after(500, self._management_tick)
+        self._mgmt_tick_after_id = self.root.after(500, self._management_tick)
 
     def _management_sync_body_height(self) -> None:
         body = getattr(self, "_mgmt_body", None)
@@ -223,34 +225,6 @@ class ManagementUiMixin:
         selected = self.mgmt_fleet_tree.selection()
         if selected:
             self.mgmt_target_id_var.set(str(self.mgmt_fleet_tree.item(selected[0], "values")[0]))
-
-    def _management_copy_snapshot(self) -> None:
-        target = self.mgmt_target_id_var.get().strip() or "-"
-        now = time.monotonic()
-        text = (
-            f"Callbox {target}\nOnline={self.mgmt_online_badge.cget('text')} Health={self.mgmt_health_badge.cget('text')}\n"
-            f"FW={self.mgmt_vars['fw'].get()} Comm={self.mgmt_vars['comm'].get()} Task1={self.mgmt_vars['task1'].get()} Task2={self.mgmt_vars['task2'].get()}\n"
-            f"WiFi={self.mgmt_vars['wifi'].get()} IP={self.mgmt_vars['ip'].get()} RSSI={self.mgmt_vars['rssi'].get()}\n"
-            f"RAM={self.mgmt_vars['ram_usage'].get()} ({self.mgmt_vars['ram_used'].get()}) Flash={self.mgmt_vars['flash_usage'].get()} ({self.mgmt_vars['flash_used'].get()})\n"
-            f"RAM free={self.mgmt_vars['ram_free'].get()} Min={self.mgmt_vars['ram_min_free'].get()} Reset={self.mgmt_vars['reset_reason'].get()}\n"
-            f"MQTTdrop={self.mgmt_vars['mqtt_drop'].get()} CmdDrop={self.mgmt_vars['cmd_drop'].get()}\n"
-            f"Diagnostic={self.mgmt_diag_current_title.cget('text') if hasattr(self, 'mgmt_diag_current_title') else '-'}\n"
-            f"Freshness status={age_text(self._mgmt_last_status_rx, now)} io={age_text(self._mgmt_last_io_rx, now)} health={age_text(self._mgmt_last_health_rx, now)} diagnostic={age_text(self._mgmt_last_diagnostic_rx, now)}"
-        )
-        self.root.clipboard_clear()
-        self.root.clipboard_append(text)
-        self._management_log_event("Đã copy snapshot chẩn đoán")
-
-    def _management_log_event(self, text: str) -> None:
-        if not hasattr(self, "mgmt_event_text"):
-            return
-        self.mgmt_event_text.config(state=tk.NORMAL)
-        self.mgmt_event_text.insert(tk.END, f"{time.strftime('%H:%M:%S')}  {text}\n")
-        lines = int(self.mgmt_event_text.index("end-1c").split(".")[0])
-        if lines > 120:
-            self.mgmt_event_text.delete("1.0", "20.0")
-        self.mgmt_event_text.see(tk.END)
-        self.mgmt_event_text.config(state=tk.DISABLED)
 
     def _management_note_change(self, key: str, value, text: str) -> None:
         previous = self._mgmt_event_values.get(key, object())
@@ -358,6 +332,8 @@ class ManagementUiMixin:
             self.mgmt_fleet_tree.insert("", tk.END, iid=callbox_id, values=values, tags=(tag,))
 
     def _management_tick(self) -> None:
+        if getattr(self, "_closing", False):
+            return
         if not hasattr(self, "mgmt_fleet_tree"):
             return
         now = time.monotonic()
@@ -374,19 +350,21 @@ class ManagementUiMixin:
             self.mgmt_mqtt_badge.config(text=f"MQTT: CONNECTED | {target or '-'}", fg=COLORS.success)
             online = device_is_online(record, now)
             self.mgmt_online_badge.config(text="ONLINE" if online else "OFFLINE", bg=COLORS.success_bg if online else COLORS.danger_bg, fg=COLORS.success_text if online else COLORS.danger_text)
+            level, alarms = alarm_state(record, now)
+            palette = {"OK": (COLORS.success_bg, COLORS.success_text), "WARN": (COLORS.warning_bg, COLORS.warning_text), "FAULT": (COLORS.danger_bg, COLORS.danger_text), "OFFLINE": (COLORS.danger_bg, COLORS.danger_text)}
+            bg, fg = palette.get(level, (COLORS.border, COLORS.muted))
+            self.mgmt_health_badge.config(text=f"HEALTH: {level}", bg=bg, fg=fg)
+            self.mgmt_alarm_label.config(text=("✓ Không phát hiện bất thường" if not alarms else "⚠ " + "  •  ".join(alarms[:4])), bg=bg, fg=fg)
         else:
-            self.mgmt_mqtt_badge.config(text="MQTT: OFFLINE", fg=COLORS.danger)
-            self.mgmt_online_badge.config(text="UNKNOWN", bg=COLORS.border, fg=COLORS.muted)
+            self.mgmt_mqtt_badge.config(text="MQTT: CHƯA KẾT NỐI", fg=COLORS.muted)
+            self.mgmt_online_badge.config(text="OFFLINE", bg=COLORS.border, fg=COLORS.muted)
+            self.mgmt_health_badge.config(text="HEALTH: --", bg=COLORS.border, fg=COLORS.muted)
+            self.mgmt_alarm_label.config(text="● Chưa kết nối MQTT Broker (Nhấn 'KẾT NỐI MQTT' để quản lý)", bg=COLORS.border, fg=COLORS.muted)
             online = False
         if not online and self._mgmt_snapshot_visible:
             self._management_clear_live_snapshot()
-        level, alarms = alarm_state(record, now) if self.mqtt_is_connected else ("OFFLINE", ["MQTT tool chưa kết nối"])
         telemetry = telemetry_state(record, now)
         self.mgmt_vars["telemetry_health"].set("  ".join(f"{key.upper()} {value}" for key, value in telemetry.items()))
-        palette = {"OK": (COLORS.success_bg, COLORS.success_text), "WARN": (COLORS.warning_bg, COLORS.warning_text), "FAULT": (COLORS.danger_bg, COLORS.danger_text), "OFFLINE": (COLORS.danger_bg, COLORS.danger_text)}
-        bg, fg = palette.get(level, (COLORS.border, COLORS.muted))
-        self.mgmt_health_badge.config(text=f"HEALTH: {level}", bg=bg, fg=fg)
-        self.mgmt_alarm_label.config(text=("✓ Không phát hiện bất thường" if not alarms else "⚠ " + "  •  ".join(alarms[:4])), bg=bg, fg=fg)
         support = "Management Diagnostic" if record.get("management_supported") else "Firmware cũ chưa hỗ trợ Management Diagnostic"
         self.mgmt_freshness_label.config(text=f"{support}  |  {self.mgmt_vars['telemetry_health'].get()}  |  Trace {age_text(self._mgmt_last_trace_rx, now)}")
         for key in ("comm", "fw", "task1", "task2"):
@@ -397,4 +375,5 @@ class ManagementUiMixin:
                 label.config(fg=color)
         for callbox_id, fleet_record in list(self._fleet_devices.items()):
             self._management_update_fleet_row(callbox_id, fleet_record)
-        self.root.after(500, self._management_tick)
+        if not getattr(self, "_closing", False):
+            self._mgmt_tick_after_id = self.root.after(500, self._management_tick)

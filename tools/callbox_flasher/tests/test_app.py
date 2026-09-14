@@ -270,8 +270,34 @@ class AppTests(unittest.TestCase):
         self.assertIsNone(client.on_connect)
         self.assertIsNone(client.on_log)
 
+    def test_mqtt_disconnect_clears_fleet_and_badges_cleanly(self):
+        import tkinter as tk
+        from tools.callbox_flasher.src.ui import FlasherApp
+
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            app = FlasherApp(root)
+            app.mqtt_is_connected = True
+            app.mqtt_client = type("ConnectedClient", (), {"connected": True, "disconnect": lambda self: None})()
+            app._fleet_devices = {"0063": {"online": True}}
+            app.mgmt_fleet_tree.insert("", "end", iid="0063", values=("0063", "ONLINE", "OK", "ready", "-50", "1.5.6", "1s"))
+            app.mgmt_mqtt_badge.config(text="MQTT: CONNECTED", fg="green")
+            app.mgmt_online_badge.config(text="ONLINE", bg="green", fg="white")
+            app.mgmt_health_badge.config(text="HEALTH: OK", bg="green", fg="white")
+
+            app._on_mqtt_disconnect_click()
+
+            self.assertFalse(app.mqtt_is_connected)
+            self.assertIsNone(app.mqtt_client)
+            self.assertEqual(len(app._fleet_devices), 0)
+            self.assertEqual(len(app.mgmt_fleet_tree.get_children()), 0)
+            self.assertEqual(app.mgmt_mqtt_badge.cget("text"), "MQTT: ĐÃ NGẮT")
+            self.assertEqual(app.mgmt_online_badge.cget("text"), "OFFLINE")
+            self.assertEqual(app.mgmt_health_badge.cget("text"), "HEALTH: --")
+        finally:
+            root.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()
-
-

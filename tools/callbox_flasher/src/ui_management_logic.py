@@ -53,10 +53,17 @@ def health_level(record: dict) -> str:
     if health.get("recovery") or (free_heap and free_heap < 20 * 1024):
         return "FAULT"
     mqtt = health.get("mqtt", {})
-    errors = sum(int(mqtt.get(key, 0) or 0) for key in (
-        "queue_drop", "stale_drop", "inflight_drop", "outbox_fail", "cmd_drop"
-    ))
-    if (free_heap and free_heap < 32 * 1024) or errors > 0:
+    # If detailed queue breakdown is available, ignore non-critical trace drops
+    if "wcs_queue_drop" in mqtt or "management_trace_drop" in mqtt:
+        critical_errors = sum(int(mqtt.get(key, 0) or 0) for key in (
+            "wcs_queue_drop", "management_critical_drop", "cmd_drop", "outbox_fail"
+        ))
+    else:
+        critical_errors = sum(int(mqtt.get(key, 0) or 0) for key in (
+            "queue_drop", "stale_drop", "inflight_drop", "outbox_fail", "cmd_drop"
+        ))
+    queue_current = int(mqtt.get("queue_current", 0) or 0)
+    if (free_heap and free_heap < 32 * 1024) or critical_errors > 0 or queue_current > 5:
         return "WARN"
     return "OK"
 

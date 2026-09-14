@@ -77,13 +77,16 @@ class WorkerUiMixin:
         self._worker_refresh_release_summary()
         self._worker_sync_ports()
         self._worker_update_button_state()
-        self.root.after(PORT_POLL_MS, self._worker_poll_ports)
+        self._poll_ports_after_id = self.root.after(PORT_POLL_MS, self._worker_poll_ports)
 
     def _worker_poll_ports(self) -> None:
+        if getattr(self, "_closing", False):
+            return
         try:
             if not self.controller.busy:
                 self._refresh_ports()
-            self.root.after(PORT_POLL_MS, self._worker_poll_ports)
+            if not getattr(self, "_closing", False):
+                self._poll_ports_after_id = self.root.after(PORT_POLL_MS, self._worker_poll_ports)
         except tk.TclError:
             pass
 

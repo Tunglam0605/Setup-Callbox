@@ -262,6 +262,8 @@ class FlashWorkflowMixin:
             config=dev_config,
         )
     def _drain_events(self) -> None:
+        if getattr(self, "_closing", False):
+            return
         try:
             while True:
                 event = self.event_queue.get_nowait()
@@ -269,7 +271,8 @@ class FlashWorkflowMixin:
         except queue.Empty:
             pass
         finally:
-            self.root.after(50, self._drain_events)
+            if not getattr(self, "_closing", False):
+                self._drain_events_after_id = self.root.after(50, self._drain_events)
     def _handle_event(self, event: ProvisionEvent) -> None:
         if getattr(self, "_worker_job_active", False) and hasattr(self, "_worker_render_event"):
             self._worker_render_event(event)
